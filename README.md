@@ -1,7 +1,8 @@
 # Gobble & Run — The Great Turkey Escape
 
-[![Rank](https://make.fun/badge/turkey-run-game-01/hakeno337/turkey-run-game-01/rank.svg)](https://make.fun/c/turkey-run-game-01)
-[![Reward](https://make.fun/badge/turkey-run-game-01/hakeno337/turkey-run-game-01/reward.svg)](https://make.fun/c/turkey-run-game-01)
+[![make.fun · turkey-run-game-01](https://make.fun/badge/turkey-run-game-01.svg)](https://make.fun/bounty/turkey-run-game-01?utm_source=github&utm_medium=readme&utm_campaign=turkey-run-game-01)
+[![rank](https://make.fun/badge/turkey-run-game-01/hakeno337/turkey-run-game-01/rank.svg)](https://make.fun/bounty/turkey-run-game-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=turkey-run-game-01)
+[![reward](https://make.fun/badge/turkey-run-game-01/hakeno337/turkey-run-game-01/reward.svg)](https://make.fun/bounty/turkey-run-game-01?utm_source=github&utm_medium=readme&utm_campaign=turkey-run-game-01)
 
 An original turkey escape game for the make.fun **turkey-run-game-01** bounty. Dinner is at
 six — and the turkey plans to be elsewhere. You are a wild turkey sprinting 1,500 metres
