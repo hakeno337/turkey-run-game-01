@@ -10,7 +10,7 @@ import {
 import { between, makeRandom, pick } from './random.js';
 import {
   drawChoppingBlock, drawCorn, drawFarmer, drawFeatherIcon, drawFence, drawHangingKnives,
-  drawHayBale, drawOven, drawTurkey,
+  drawHayBale, drawOven, drawPumpkin, drawTurkey,
 } from './art.js';import { drawBackdrop, drawEscapeGate, drawLeaves } from './world.js';
 import { playCaught, playCorn, playEscaped, playFlap, playHit, playJump } from './sound.js';
 
@@ -300,6 +300,37 @@ function turkeyPose(state, forTitle = false) {
   };
 }
 
+/** A soft contact shadow that grounds a figure or prop on the dirt. */
+function contactShadow(ctx, x, width, strength) {
+  ctx.save();
+  ctx.globalAlpha = strength;
+  ctx.fillStyle = '#3a1e05';
+  ctx.beginPath();
+  ctx.ellipse(x, GROUND_Y + 5, width, width * 0.16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Pale speed streaks trailing a runner, so a still frame still reads as motion. */
+function speedStreaks(ctx, state, x, yBase, count) {
+  const speedT = (state.speed - RUN.startSpeed) / (RUN.topSpeed - RUN.startSpeed);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,240,210,0.5)';
+  ctx.lineCap = 'round';
+  for (let i = 0; i < count; i += 1) {
+    const len = 34 + ((i * 47) % 50) + speedT * 46;
+    const y = yBase - 14 - ((i * 29) % 64);
+    const drift = ((state.time * 620 + i * 131) % 90);
+    ctx.globalAlpha = 0.1 + speedT * 0.16;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(x - drift - len, y);
+    ctx.lineTo(x - drift, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawEntities(ctx, state) {
   // The escape gate appears in the last stretch of the run.
   const gateWorldX = ESCAPE_METRES * PIXELS_PER_METRE;
@@ -315,6 +346,7 @@ function drawEntities(ctx, state) {
   for (const ob of state.obstacles) {
     const sx = ob.worldX - state.scroll;
     if (sx < -200 || sx > VIEW.width + 120) continue;
+    contactShadow(ctx, sx + ob.w / 2, ob.w * 0.52, 0.3);
     ctx.save();
     if (ob.kind === 'fence') { ctx.translate(sx, GROUND_Y); drawFence(ctx, ob.w, ob.h); }
     else if (ob.kind === 'hay') { ctx.translate(sx + ob.w / 2, GROUND_Y); drawHayBale(ctx, ob.w, ob.h); }
@@ -327,30 +359,55 @@ function drawEntities(ctx, state) {
   // The farmer, closing in from the left.
   const farmerX = TURKEY.x - state.farmerGap - 66;
   if (farmerX > -140) {
+    contactShadow(ctx, farmerX + 6, 52, 0.34);
+    if (state.screen === 'play') speedStreaks(ctx, state, farmerX - 16, GROUND_Y, 4);
     ctx.save();
     ctx.translate(farmerX, GROUND_Y);
+    ctx.scale(1.1, 1.1);
     const reach = Math.max(0, Math.min(1, 1 - (state.farmerGap - FARMER.caughtGap) / 260));
     drawFarmer(ctx, { runPhase: state.turkey.runPhase * 1.06 + 1.2, reach });
     ctx.restore();
   }
 
-  // The turkey, flashing while invulnerable, wobbling while it stumbles.
+  // The turkey, drawn a touch larger than life, bobbing with each stride, flashing while
+  // invulnerable, wobbling while it stumbles.
   const t = state.turkey;
+  const airT = Math.min(1, t.y / 260);
+  contactShadow(ctx, TURKEY.x, 56 - airT * 18, 0.36 - airT * 0.17);
+  if (state.screen === 'play') speedStreaks(ctx, state, TURKEY.x - 52, GROUND_Y - t.y, 6);
   ctx.save();
-  ctx.translate(TURKEY.x, GROUND_Y - t.y);
+  const bob = t.grounded ? -Math.abs(Math.sin(t.runPhase)) * 2.4 : 0;
+  ctx.translate(TURKEY.x, GROUND_Y - t.y + bob);
+  ctx.scale(1.16, 1.16);
   if (t.stumble > 0) ctx.rotate(Math.sin(state.time * 40) * 0.05);
   if (t.invulnerable > 0 && Math.floor(state.time * 14) % 2 === 0) ctx.globalAlpha = 0.45;
   drawTurkey(ctx, turkeyPose(state));
   ctx.restore();
 }
 
-function panel(ctx, x, y, w, h, fill = 'rgba(43,22,8,0.72)') {
+function panel(ctx, x, y, w, h, fill = null) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(28,10,0,0.5)';
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetY = 4;
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, 'rgba(80,44,16,0.9)');
+  grad.addColorStop(0.5, 'rgba(56,29,10,0.9)');
+  grad.addColorStop(1, 'rgba(38,19,6,0.92)');
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, 12);
-  ctx.fillStyle = fill;
+  ctx.fillStyle = fill ?? grad;
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,214,150,0.5)';
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(255,214,150,0.6)';
   ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 12);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,240,210,0.16)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.roundRect(x + 3.5, y + 3.5, w - 7, h - 7, 9);
   ctx.stroke();
 }
 
@@ -394,19 +451,73 @@ function drawHUD(ctx, state) {
   ctx.roundRect(trackX, 52, trackW, 14, 7);
   ctx.fill();
   const progress = Math.min(1, state.distanceM / ESCAPE_METRES);
-  ctx.fillStyle = '#8fce4e';
+  const fillGrad = ctx.createLinearGradient(trackX, 52, trackX, 66);
+  fillGrad.addColorStop(0, '#a8e063');
+  fillGrad.addColorStop(1, '#6db33a');
+  ctx.fillStyle = fillGrad;
   ctx.beginPath();
   ctx.roundRect(trackX, 52, Math.max(14, trackW * progress), 14, 7);
   ctx.fill();
-  ctx.font = '17px Verdana, sans-serif';
-  ctx.fillText('🦃', trackX + trackW * progress, 68);
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.roundRect(trackX + 3, 54.5, Math.max(8, trackW * progress - 6), 4, 2);
+  ctx.fill();
+  // The markers are the cast themselves, drawn small: turkey ahead, farmer behind,
+  // and a pine standing at the Wildwood end of the track.
+  ctx.save();
+  ctx.translate(trackX + trackW * progress, 76);
+  ctx.scale(0.2, 0.2);
+  drawTurkey(ctx, {
+    runPhase: state.time * 11, wingLift: 0.3, airborne: false, sliding: false, dizzy: false, blink: false,
+  });
+  ctx.restore();
   const farmerMark = Math.max(0, progress - state.farmerGap / (ESCAPE_METRES * PIXELS_PER_METRE));
-  ctx.fillText('🧑‍🌾', trackX + trackW * farmerMark, 68);
-  ctx.fillText('🌲', trackX + trackW - 4, 68);
+  ctx.save();
+  ctx.translate(trackX + trackW * farmerMark, 76);
+  ctx.scale(0.155, 0.155);
+  drawFarmer(ctx, { runPhase: state.time * 11 + 1.2, reach: 0.45 });
+  ctx.restore();
+  ctx.fillStyle = '#2e5d23';
+  ctx.beginPath();
+  ctx.moveTo(trackX + trackW - 11, 68);
+  ctx.lineTo(trackX + trackW, 44);
+  ctx.lineTo(trackX + trackW + 11, 68);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#4a7c36';
+  ctx.beginPath();
+  ctx.moveTo(trackX + trackW - 8, 58);
+  ctx.lineTo(trackX + trackW, 40);
+  ctx.lineTo(trackX + trackW + 8, 58);
+  ctx.closePath();
+  ctx.fill();
 
-  // Zone banner.
+  // Zone banner, announced on a wooden plank sign.
   if (state.zoneBanner > 0) {
     ctx.globalAlpha = Math.min(1, state.zoneBanner);
+    const plankGrad = ctx.createLinearGradient(0, 102, 0, 198);
+    plankGrad.addColorStop(0, 'rgba(122,79,38,0.95)');
+    plankGrad.addColorStop(1, 'rgba(84,52,20,0.95)');
+    ctx.beginPath();
+    ctx.roundRect(VIEW.width / 2 - 302, 102, 604, 96, 10);
+    ctx.fillStyle = plankGrad;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(46,26,8,0.8)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,220,160,0.25)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(VIEW.width / 2 - 288, 128);
+    ctx.lineTo(VIEW.width / 2 + 288, 128);
+    ctx.stroke();
+    ctx.fillStyle = '#3a2410';
+    for (const nx of [-282, 282]) {
+      ctx.beginPath();
+      ctx.arc(VIEW.width / 2 + nx, 116, 4, 0, Math.PI * 2);
+      ctx.arc(VIEW.width / 2 + nx, 184, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.textAlign = 'center';
     ctx.font = '800 40px Georgia, serif';
     ctx.fillStyle = '#fff3d6';
@@ -438,39 +549,84 @@ function bigTitle(ctx, text, y, size, fill, stroke) {
   ctx.textAlign = 'center';
   ctx.font = `900 ${size}px Georgia, 'Times New Roman', serif`;
   ctx.lineWidth = size / 7;
+  ctx.save();
+  ctx.shadowColor = 'rgba(43,16,0,0.55)';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = size / 14;
   ctx.strokeStyle = stroke;
   ctx.strokeText(text, VIEW.width / 2, y);
   ctx.fillStyle = fill;
   ctx.fillText(text, VIEW.width / 2, y);
+  ctx.restore();
+  // A faint warm top-light along the lettering.
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = '#fff2cf';
+  ctx.fillText(text, VIEW.width / 2, y - size / 30);
+  ctx.restore();
 }
 
 function drawTitleScreen(ctx, state) {
-  // The two stars of the chase flank the instructions panel, running on the spot.
+  // A slow sunburst turning behind the lettering, rays fanning from the title's heart.
+  ctx.save();
+  ctx.translate(VIEW.width / 2, 268);
+  ctx.rotate(state.time * 0.02);
+  ctx.fillStyle = 'rgba(255,220,150,0.10)';
+  for (let i = 0; i < 12; i += 1) {
+    ctx.rotate(Math.PI / 6);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(560, -52);
+    ctx.lineTo(560, 52);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+  // The two stars of the chase flank the instructions panel, running on the spot —
+  // drawn larger than life, with the harvest dressing their feet.
   const phase = state.time * 9;
+  contactShadow(ctx, 178, 74, 0.35);
+  contactShadow(ctx, 1092, 78, 0.35);
   ctx.save();
   ctx.translate(178, GROUND_Y);
-  ctx.scale(1.28, 1.28);
+  ctx.scale(1.46, 1.46);
   drawFarmer(ctx, { runPhase: phase * 1.06 + 1.2, reach: 0.55 });
   ctx.restore();
   ctx.save();
   ctx.translate(1092, GROUND_Y);
-  ctx.scale(1.34, 1.34);
+  ctx.scale(1.55, 1.55);
   drawTurkey(ctx, {
     runPhase: phase, wingLift: 0.3, airborne: false, sliding: false, dizzy: false,
     blink: Math.sin(state.time * 0.7) > 0.97,
   });
   ctx.restore();
+  ctx.save();
+  ctx.translate(96, GROUND_Y + 4);
+  drawPumpkin(ctx, 62, 0);
+  ctx.restore();
+  ctx.save();
+  ctx.translate(1216, GROUND_Y + 4);
+  drawPumpkin(ctx, 54, 1);
+  ctx.restore();
   drawCorn(ctx, 1006, GROUND_Y - 30, false, state.time);
   drawCorn(ctx, 1180, GROUND_Y - 26, true, state.time);
-  ctx.fillStyle = 'rgba(46,20,4,0.30)';
+  ctx.fillStyle = 'rgba(46,20,4,0.24)';
   ctx.fillRect(0, 0, VIEW.width, VIEW.height);
 
   ctx.textAlign = 'center';
   ctx.font = '700 25px Georgia, serif';
   ctx.fillStyle = '#ffe9bb';
   ctx.fillText('· T H E   G R E A T   T U R K E Y   E S C A P E ·', VIEW.width / 2, 128);
-  bigTitle(ctx, 'GOBBLE', 238, 118, '#ffb03a', '#5d2405');
-  bigTitle(ctx, '& RUN!', 348, 118, '#ff7847', '#5d2405');
+  const gobbleGrad = ctx.createLinearGradient(0, 130, 0, 245);
+  gobbleGrad.addColorStop(0, '#ffd94d');
+  gobbleGrad.addColorStop(0.55, '#ffb03a');
+  gobbleGrad.addColorStop(1, '#f07f2e');
+  bigTitle(ctx, 'GOBBLE', 238, 118, gobbleGrad, '#5d2405');
+  const runGrad = ctx.createLinearGradient(0, 240, 0, 355);
+  runGrad.addColorStop(0, '#ff9a5c');
+  runGrad.addColorStop(0.55, '#ff7847');
+  runGrad.addColorStop(1, '#e2492f');
+  bigTitle(ctx, '& RUN!', 348, 118, runGrad, '#5d2405');
   ctx.font = 'italic 600 23px Georgia, serif';
   ctx.fillStyle = '#fff3d6';
   ctx.fillText('Dinner is at six. He plans to be elsewhere.', VIEW.width / 2, 398);
@@ -500,7 +656,7 @@ function drawTitleScreen(ctx, state) {
 
 function drawEndScreen(ctx, state) {
   const stats = state.endStats ?? { distance: 0, score: 0, corn: 0, escaped: state.screen === 'escaped' };
-  ctx.fillStyle = stats.escaped ? 'rgba(24,44,10,0.45)' : 'rgba(50,10,4,0.5)';
+  ctx.fillStyle = stats.escaped ? 'rgba(24,44,10,0.36)' : 'rgba(50,10,4,0.44)';
   ctx.fillRect(0, 0, VIEW.width, VIEW.height);
   if (stats.escaped) {
     bigTitle(ctx, 'ESCAPED!', 190, 96, '#a5e36a', '#1d3a08');
@@ -546,6 +702,7 @@ export function drawGame(ctx, state) {
   drawBackdrop(ctx, state.scroll, state.time, zone, state.screen === 'play' ? blend : 0);
   if (state.screen === 'title') {
     drawTitleScreen(ctx, state);
+    drawLeaves(ctx, state.time, state.scroll);
   } else {
     drawEntities(ctx, state);
     drawParticles(ctx, state);
@@ -553,6 +710,15 @@ export function drawGame(ctx, state) {
     if (state.screen === 'play') drawHUD(ctx, state);
     else drawEndScreen(ctx, state);
   }
+  // A warm vignette settles over every frame, darkening the corners into the sunset.
+  const vig = ctx.createRadialGradient(
+    VIEW.width / 2, VIEW.height / 2, VIEW.height * 0.44,
+    VIEW.width / 2, VIEW.height / 2, VIEW.height * 0.98,
+  );
+  vig.addColorStop(0, 'rgba(43,17,0,0)');
+  vig.addColorStop(1, 'rgba(43,17,0,0.27)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, VIEW.width, VIEW.height);
   if (state.flash > 0) {
     ctx.fillStyle = `rgba(255,60,30,${state.flash * 0.55})`;
     ctx.fillRect(0, 0, VIEW.width, VIEW.height);

@@ -17,6 +17,11 @@ function cornRow(state, screenX, yOff, count, golden = false) {
   }
 }
 
+/** One frozen particle — dust, ember or feather — placed by hand for the still frame. */
+function puff(state, x, y, colour, size) {
+  state.particles.push({ x, y, vx: 0, vy: 0, life: 1, age: 0.06, colour, size });
+}
+
 /** Title: the lettering over the farm at golden hour, the stars flanking the panel. */
 function stageTitle(state) {
   state.screen = 'title';
@@ -43,6 +48,14 @@ function stagePlay(state) {
   cornRow(state, 420, 150, 3);
   cornRow(state, 980, 34, 2);
   state.corns.push({ worldX: state.scroll + 640, yOff: 120, golden: true, taken: false });
+  // The leap's story in dust and feathers: a kicked-up cloud where he left the ground,
+  // two feathers shaken loose behind him, sparkles crowning the prize cob.
+  for (const [x, y, s] of [[238, 596, 5], [268, 588, 7], [300, 598, 6], [206, 580, 4], [286, 578, 4]]) {
+    puff(state, x, y, '#caa066', s);
+  }
+  puff(state, 208, 428, '#e8d9ae', 5.5);
+  puff(state, 248, 468, '#d9c491', 4.5);
+  for (const [x, y] of [[618, 452], [664, 442], [640, 424]]) puff(state, x, y, '#ffd94d', 3.4);
 }
 
 /** Chase: deep in the kitchen yard, the farmer's knife a breath from the tail fan. */
@@ -61,6 +74,17 @@ function stageChase(state) {
   place(state, 'knives', 1010);
   cornRow(state, 520, 34, 3);
   cornRow(state, 1060, 30, 2);
+  // Breathless detail: dust boiling off the farmer's boots, a feather torn from the
+  // tail fan by the knife's pass, embers spitting from the oven door.
+  for (const [x, y, s] of [[52, 594, 6], [84, 586, 8], [116, 597, 5], [30, 584, 4], [98, 576, 4]]) {
+    puff(state, x, y, '#caa066', s);
+  }
+  for (const [x, y, s] of [[286, 592, 5], [312, 584, 6], [262, 598, 4]]) puff(state, x, y, '#caa066', s);
+  puff(state, 226, 512, '#e8d9ae', 5.5);
+  puff(state, 252, 548, '#d9c491', 4);
+  for (const [x, y, c] of [[716, 556, '#ffb03a'], [742, 536, '#ff7847'], [768, 562, '#ffd94d'], [730, 578, '#ff7847']]) {
+    puff(state, x, y, c, 3.2);
+  }
 }
 
 /** End: through the gate — the escaped screen over the Wildwood scene. */
@@ -71,9 +95,14 @@ function stageEnd(state) {
   state.score = 16840;
   state.cornEaten = 27;
   state.zoneIndex = 2;
-  state.farmerGap = 320;
+  state.farmerGap = 430; // far enough back that no stray knife tip enters the frame
   state.turkey.runPhase = 3.3;
   state.endStats = { distance: ESCAPE_METRES, score: 16840, corn: 27, escaped: true };
+  // A celebratory burst where he burst through: golden sparkles and shaken-loose leaves.
+  for (const [x, y, c, s] of [
+    [262, 500, '#ffd94d', 3.6], [352, 470, '#ffd94d', 3.2], [300, 436, '#a5e36a', 4],
+    [392, 520, '#e3a83a', 4.4], [228, 548, '#d97c2b', 4.4], [330, 556, '#a5e36a', 3.6],
+  ]) puff(state, x, y, c, s);
 }
 
 /**
